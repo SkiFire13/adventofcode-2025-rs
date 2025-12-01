@@ -10,8 +10,8 @@ pub fn part1(input: &Input) -> usize {
     let mut cnt = 0;
     let mut curr = 50;
 
-    for &(right, n) in input {
-        let n = if right { n } else { 100 - (n % 100) };
+    for &(positive, n) in input {
+        let n = if positive { n } else { 100 - (n % 100) };
         curr = (curr + n) % 100;
         cnt += (curr == 0) as usize
     }
@@ -23,20 +23,20 @@ pub fn part2(input: &Input) -> usize {
     let mut cnt = 0;
     let mut curr = 50;
 
-    for &(right, mut n) in input {
-        while n >= 100 {
-            n -= 100;
-            cnt += 1;
-        }
-        if n != 0 {
-            if right {
-                cnt += (curr + n >= 100) as usize;
+    for &(positive, n) in input {
+        let (hundreds, rest) = (n / 100, n % 100);
+        cnt += hundreds;
+
+        if rest != 0 {
+            if positive {
+                cnt += (curr + rest >= 100) as usize;
             } else if curr > 0 {
-                cnt += (n >= curr) as usize;
+                cnt += (rest >= curr) as usize;
             }
+
+            let k = if positive { n } else { 100 - rest };
+            curr = (curr + k) % 100;
         }
-        let n = if right { n } else { 100 - (n % 100) };
-        curr = (curr + n) % 100;
     }
 
     cnt
