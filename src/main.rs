@@ -1,5 +1,5 @@
 aoc_helper::main!(2025 =>
-    // day1,
+    day1,
     // day2,
     // day3,
     // day4,
