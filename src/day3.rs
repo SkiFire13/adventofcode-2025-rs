@@ -6,22 +6,23 @@ pub fn input_generator(input: &str) -> Input {
     input.lines().map(|line| line.chars().map(|c| c as u8 - b'0').collect()).collect()
 }
 
-fn solve(mut line: &[u8], n: usize) -> usize {
-    let mut sum = 0;
+fn solve(line: &[u8], n: usize) -> usize {
+    let mut stack = Vec::with_capacity(n);
 
-    for i in (0..n).rev() {
-        let mut jm = 0;
-        for j in 0..line.len() - i {
-            if line[j] > line[jm] {
-                jm = j;
-            }
+    for (i, &b) in line.iter().enumerate() {
+        let remaining = line.len() - i - 1;
+        while let Some(&last) = stack.last()
+            && last < b
+            && stack.len() + remaining >= n
+        {
+            stack.pop();
         }
-
-        sum = 10 * sum + line[jm] as usize;
-        line = &line[jm + 1..];
+        if stack.len() < n {
+            stack.push(b);
+        }
     }
 
-    sum
+    stack.into_iter().fold(0, |acc, d| 10 * acc + d as usize)
 }
 
 pub fn part1(input: &Input) -> usize {
