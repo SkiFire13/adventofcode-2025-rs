@@ -7,25 +7,11 @@ pub fn input_generator(input: &str) -> Input {
 }
 
 pub fn part1(input: &Input) -> usize {
-    let mut count = 0;
-
-    for (x, y) in input.iter_by_row() {
-        if input[(x, y)] != b'@' {
-            continue;
-        }
-        let mut nc = 0;
-        for (nx, ny) in input.square_neighbours((x, y)) {
-            if input[(nx, ny)] == b'@' {
-                nc += 1;
-            }
-        }
-
-        if nc < 4 {
-            count += 1;
-        }
-    }
-
-    count
+    input
+        .iter_by_row()
+        .filter(|&p| input[p] == b'@')
+        .filter(|&p| input.square_neighbours(p).filter(|&q| input[q] == b'@').count() < 4)
+        .count()
 }
 
 pub fn part2(input: &Input) -> usize {
@@ -33,32 +19,20 @@ pub fn part2(input: &Input) -> usize {
     let mut removed = 0;
 
     loop {
-        let mut removable = Vec::new();
-
-        for (x, y) in input.iter_by_row() {
-            if input[(x, y)] != b'@' {
-                continue;
-            }
-
-            let mut nc = 0;
-            for (nx, ny) in input.square_neighbours((x, y)) {
-                if input[(nx, ny)] == b'@' {
-                    nc += 1;
-                }
-            }
-
-            if nc < 4 {
-                removable.push((x, y));
-            }
-        }
+        let removable = input
+            .iter_by_row()
+            .filter(|&p| input[p] == b'@')
+            .filter(|&p| input.square_neighbours(p).filter(|&q| input[q] == b'@').count() < 4)
+            .collect::<Vec<_>>();
 
         if removable.is_empty() {
             return removed;
         }
 
         removed += removable.len();
-        for (x, y) in removable {
-            input[(x, y)] = b'.';
+
+        for p in removable {
+            input[p] = b'.';
         }
     }
 }
