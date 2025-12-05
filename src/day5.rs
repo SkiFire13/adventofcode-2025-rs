@@ -18,22 +18,7 @@ pub fn input_generator(input: &str) -> Input {
 
 pub fn part1(input: &Input) -> usize {
     let (fresh, available) = input;
-
-    let mut tot = 0;
-
-    for &i in available {
-        let mut spoiled = true;
-        for &(s, e) in fresh {
-            if s <= i && i <= e {
-                spoiled = false;
-            }
-        }
-        if !spoiled {
-            tot += 1;
-        }
-    }
-
-    tot
+    available.iter().filter(|&&i| fresh.iter().any(|&(s, e)| s <= i && i <= e)).count()
 }
 
 pub fn part2(input: &Input) -> usize {
@@ -42,11 +27,10 @@ pub fn part2(input: &Input) -> usize {
     let mut end = 0;
     let mut tot = 0;
 
-    for &(mut s, mut e) in fresh {
-        s = s.max(end);
-        e = (e + 1).max(end);
-        tot += e - s;
-        end = e;
+    for &(mut s, e) in fresh {
+        s = end.max(s);
+        end = end.max(e + 1);
+        tot += end - s;
     }
 
     tot
