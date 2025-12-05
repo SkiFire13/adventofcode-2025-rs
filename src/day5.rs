@@ -10,7 +10,6 @@ pub fn input_generator(input: &str) -> Input {
             let (s, e) = f.split_once('-').unwrap();
             (s.parse().unwrap(), e.parse().unwrap())
         })
-        .sorted()
         .collect();
     let available = available.lines().map(|a| a.parse().unwrap()).collect();
     (fresh, available)
@@ -27,7 +26,7 @@ pub fn part2(input: &Input) -> usize {
     let mut end = 0;
     let mut tot = 0;
 
-    for &(mut s, e) in fresh {
+    for (mut s, e) in fresh.iter().copied().sorted_unstable() {
         s = end.max(s);
         end = end.max(e + 1);
         tot += end - s;
