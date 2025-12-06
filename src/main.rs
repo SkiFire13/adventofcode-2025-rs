@@ -1,3 +1,5 @@
+#![allow(mismatched_lifetime_syntaxes)]
+
 aoc_helper::main!(2025 =>
     day1,
     day2,
