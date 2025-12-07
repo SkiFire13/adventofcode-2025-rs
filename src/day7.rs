@@ -9,27 +9,26 @@ pub fn input_generator(input: &str) -> Input {
 pub fn part1(input: &Input) -> usize {
     let ((sx, sy), _) = input.iter().find(|&(_, &c)| c == b'S').unwrap();
 
-    let mut pos = HashMap::from([(sx as isize, 1u64)]);
-    let mut y = sy as isize + 1;
-
     let mut splits = 0;
+    let mut active = vec![false; input.w()];
+    active[sx] = true;
 
-    while y < input.h() as isize {
-        let mut tmp = HashMap::new();
+    for y in sy + 1..input.h() {
+        let mut tmp = vec![false; input.w()];
 
-        for (x, c) in pos {
-            if let Some(&b'^') = input.iget((x, y)) {
-                *tmp.entry(x - 1).or_insert(0) += c;
-                *tmp.entry(x + 1).or_insert(0) += c;
-                splits += 1;
-            } else {
-                *tmp.entry(x).or_insert(0) += c;
+        for x in 0..input.w() {
+            if active[x] {
+                if input[(x, y)] == b'^' {
+                    tmp[x - 1] |= active[x];
+                    tmp[x + 1] |= active[x];
+                    splits += 1;
+                } else {
+                    tmp[x] |= active[x];
+                }
             }
         }
 
-        pos = tmp;
-
-        y += 1;
+        active = tmp;
     }
 
     splits
@@ -38,28 +37,23 @@ pub fn part1(input: &Input) -> usize {
 pub fn part2(input: &Input) -> u64 {
     let ((sx, sy), _) = input.iter().find(|&(_, &c)| c == b'S').unwrap();
 
-    let mut pos = HashMap::from([(sx as isize, 1u64)]);
-    let mut y = sy as isize + 1;
+    let mut active = vec![0; input.w()];
+    active[sx] = 1;
 
-    let mut splits = 1;
+    for y in sy + 1..input.h() {
+        let mut tmp = vec![0; input.w()];
 
-    while y < input.h() as isize {
-        let mut tmp = HashMap::new();
-
-        for (x, c) in pos {
-            if let Some(&b'^') = input.iget((x, y)) {
-                *tmp.entry(x - 1).or_insert(0) += c;
-                *tmp.entry(x + 1).or_insert(0) += c;
-                splits += c;
+        for x in 0..input.w() {
+            if input[(x, y)] == b'^' {
+                tmp[x - 1] += active[x];
+                tmp[x + 1] += active[x];
             } else {
-                *tmp.entry(x).or_insert(0) += c;
+                tmp[x] += active[x];
             }
         }
 
-        pos = tmp;
-
-        y += 1;
+        active = tmp;
     }
 
-    splits
+    active.into_iter().sum()
 }
