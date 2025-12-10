@@ -57,139 +57,183 @@ pub fn part1(input: &Input) -> usize {
         .sum()
 }
 
-pub fn part2(input: &Input) -> usize {
-    fn solve_rec(
-        buttons: &[Vec<usize>],
-        goal: &[usize],
-        mut steps: usize,
-        mut best: Result<usize, ()>,
-        used: &mut [bool],
-    ) -> Result<usize, ()> {
-        let buttons_can_add = buttons
-            .iter()
-            .enumerate()
-            .map(|(j, button)| (j, &**button))
-            .filter(|&(_, button)| button.iter().all(|&b| goal[b] != 0));
-
-        let min_add_steps = goal.iter().copied().max().unwrap();
-
-        if min_add_steps == 0 {
-            return best.min(Ok(steps));
-        }
-
-        if Ok(steps + min_add_steps) >= best {
-            return best;
-        }
-
-        let mut target = usize::MAX;
-        let mut target_count = usize::MAX;
-
-        for i in 0..goal.len() {
-            if goal[i] == 0 {
-                continue;
-            }
-
-            for j in 0..goal.len() {
-                if goal[j] == 0 {
-                    continue;
-                }
-
-                if goal[j] < goal[i] {
-                    if let Ok((_, button)) = buttons_can_add
-                        .clone()
-                        .filter(|&(k, _)| !used[k])
-                        .filter(|&(_, button)| button.contains(&i) && !button.contains(&j))
-                        .exactly_one()
-                    {
-                        let mut new_goal = goal.to_vec();
-                        let n = goal[i] - goal[j];
-                        for &b in button {
-                            if goal[b] < n {
-                                return best;
-                            }
-
-                            new_goal[b] -= n;
-                        }
-
-                        return solve_rec(buttons, &new_goal, steps + n, best, used);
-                    }
-                }
-            }
-
-            if let Ok((_, button)) = buttons_can_add
-                .clone()
-                .filter(|&(k, _)| !used[k])
-                .filter(|(_, button)| button.contains(&i))
-                .exactly_one()
-            {
-                let mut new_goal = goal.to_vec();
-                let n = goal[i];
-                for &b in button {
-                    if goal[b] < n {
-                        return best;
-                    }
-
-                    new_goal[b] -= n;
-                }
-
-                return solve_rec(buttons, &new_goal, steps + n, best, used);
-            }
-
-            let button_options = buttons_can_add
-                .clone()
-                .filter(|&(k, _)| !used[k])
-                .filter(|(_, button)| button.contains(&i))
-                .count();
-
-            if button_options == 0 {
-                return best;
-            }
-
-            let count = button_options * goal[i];
-
-            if count < target_count {
-                target = i;
-                target_count = count;
-            }
-        }
-
-        if target == usize::MAX {
-            return best.min(Ok(steps));
-        }
-
-        for (i, button) in buttons_can_add {
-            if used[i] || !(button.contains(&target)) {
-                continue;
-            }
-
-            let min = 0;
-            let max = button.iter().map(|&b| goal[b]).min().unwrap();
-
-            let mut new_goal = goal.to_vec();
-            button.iter().for_each(|&b| new_goal[b] -= min);
-            steps += min;
-
-            used[i] = true;
-            for j in min..max + 1 {
-                best = solve_rec(buttons, &new_goal, steps, best, used);
-
-                if j != max {
-                    button.iter().for_each(|&b| new_goal[b] -= 1);
-                    steps += 1;
-                }
-            }
-            used[i] = false;
-
-            break;
-        }
-
-        best
-    }
-
+pub fn part2(input: &Input) -> i32 {
     input
-        .par_iter()
+        .iter()
         .map(|(_, buttons, joltages)| {
-            solve_rec(buttons, joltages, 0, Err(()), &mut vec![false; buttons.len()]).unwrap()
+            let max_value = joltages.iter().copied().max().unwrap() as i32;
+
+            // Create the matrix for the system of linear equations
+            let cols = buttons.len() + 1;
+            let rows = joltages.len();
+            let mut matrix = vec![0; cols * rows];
+            for (i, button) in buttons.iter().enumerate() {
+                for &b in button {
+                    matrix[b * cols + i] = 1;
+                }
+            }
+            for (i, &j) in joltages.iter().enumerate() {
+                matrix[i * cols + (cols - 1)] = j as i32;
+            }
+
+            // Put the matrix into integer RREF
+            let mut pivot = 0;
+            for c in 0..cols - 1 {
+                let Some(row) = (pivot..rows).find(|&row| matrix[row * cols + c] != 0) else {
+                    continue;
+                };
+
+                if pivot != row {
+                    (0..cols).for_each(|c| matrix.swap(pivot * cols + c, row * cols + c));
+                }
+                if pivot != c {
+                    (0..rows).for_each(|r| matrix.swap(r * cols + c, r * cols + pivot));
+                }
+                let pivot_val = matrix[pivot * cols + pivot];
+
+                for r in 0..rows {
+                    if r == pivot {
+                        continue;
+                    }
+                    let factor = matrix[r * cols + pivot];
+                    if factor != 0 {
+                        for k in 0..cols {
+                            matrix[r * cols + k] *= pivot_val;
+                            matrix[r * cols + k] -= matrix[pivot * cols + k] * factor;
+                        }
+                    }
+                }
+
+                pivot += 1;
+                if pivot >= rows {
+                    break;
+                }
+            }
+
+            // Find the free variables.
+            let mut vars = Vec::new();
+            'c: for _ in pivot..cols - 1 {
+                // Prefer variables in equations with no other unchosen free variables.
+                // These equations allows us to get some nice bounds on the free variable later on.
+                'r: for r in 0..rows {
+                    let mut k = 0;
+                    for c in pivot..cols - 1 {
+                        if matrix[r * cols + c] != 0 && !vars.contains(&c) {
+                            if k != 0 {
+                                continue 'r;
+                            }
+                            k = c;
+                        }
+                    }
+                    if k != 0 {
+                        vars.push(k);
+                        continue 'c;
+                    }
+                }
+
+                // If the above fails, pick a variable present in the most equations
+                // to increase the chance that this allows another free variable to be chosen
+                // with the first way.
+                let mut best_c = pivot;
+                let mut best_count = 0;
+                for c in pivot..cols - 1 {
+                    if !vars.contains(&c) {
+                        let mut count = 0;
+                        for r in 0..rows {
+                            if matrix[r * cols + c] != 0 {
+                                count += 1;
+                            }
+                        }
+                        if count > best_count {
+                            best_c = c;
+                            best_count = count;
+                        }
+                    }
+                }
+                vars.push(best_c);
+            }
+
+            // Solve recursively for all free variables.
+            fn solve_rec(
+                vars: &[usize],
+                values: &mut [i32],
+                matrix: &[i32],
+                cols: usize,
+                rows: usize,
+                mut best: Result<i32, ()>,
+                max_value: i32,
+            ) -> Result<i32, ()> {
+                // If we have no more free variables compute the total.
+                if vars.len() == 0 {
+                    let mut tot = values.iter().sum();
+                    for r in 0..cols - 1 - values.len() {
+                        let mut sum = matrix[r * cols + (cols - 1)];
+                        for i in 0..values.len() {
+                            let c = cols - 1 - values.len() + i;
+                            sum -= matrix[r * cols + c] * values[i];
+                        }
+                        if sum % matrix[r * cols + r] != 0 {
+                            return best;
+                        }
+                        sum /= matrix[r * cols + r];
+                        if sum < 0 {
+                            return best;
+                        }
+                        tot += sum;
+                    }
+                    return best.min(Ok(tot));
+                }
+
+                let x = vars[0];
+
+                let mut min = 0;
+                let mut max = max_value;
+
+                // Go through each equation where this appears as the only free variable
+                // and use that to get a bound for it.
+                'r: for r in 0..rows {
+                    if matrix[r * cols + x] == 0 {
+                        continue;
+                    }
+
+                    let mut rhs = matrix[r * cols + (cols - 1)];
+                    for i in 0..values.len() {
+                        let c = cols - 1 - values.len() + i;
+                        if c != x && matrix[r * cols + c] != 0 {
+                            if vars.contains(&c) {
+                                continue 'r;
+                            } else {
+                                rhs -= matrix[r * cols + c] * values[i];
+                            }
+                        }
+                    }
+
+                    // Require the corresponding pivot variable to be positive or zero.
+                    let n = matrix[r * cols + r];
+                    let m = matrix[r * cols + x];
+                    if (n > 0) ^ (m > 0) {
+                        min = min.max(rhs / m);
+                    } else {
+                        max = max.min(rhs / m);
+                    }
+                }
+
+                // Go through all possible values for this variable.
+                let mut v = min;
+                while v <= max {
+                    values[x - (cols - 1 - values.len())] = v;
+                    best = solve_rec(&vars[1..], values, matrix, cols, rows, best, max_value);
+                    if let Ok(best) = best {
+                        max = max.min(best);
+                    }
+                    v += 1;
+                }
+
+                best
+            }
+
+            solve_rec(&vars, &mut vec![0; vars.len()], &matrix, cols, rows, Err(()), max_value)
+                .unwrap()
         })
         .sum()
 }
