@@ -71,13 +71,18 @@ pub fn part2(input: &Input) -> usize {
             .map(|(j, button)| (j, &**button))
             .filter(|&(_, button)| button.iter().all(|&b| goal[b] != 0));
 
-        if Ok(steps) >= best {
+        let min_add_steps = goal.iter().copied().max().unwrap();
+
+        if min_add_steps == 0 {
+            return best.min(Ok(steps));
+        }
+
+        if Ok(steps + min_add_steps) >= best {
             return best;
         }
 
         let mut target = usize::MAX;
         let mut target_count = usize::MAX;
-        let mut target_exclude = usize::MAX;
 
         for i in 0..goal.len() {
             if goal[i] == 0 {
@@ -85,41 +90,66 @@ pub fn part2(input: &Input) -> usize {
             }
 
             for j in 0..goal.len() {
-                if goal[j] == 0 || goal[j] >= goal[i] {
+                if goal[j] == 0 {
                     continue;
                 }
 
-                let count = buttons_can_add
-                    .clone()
-                    .filter(|&(k, button)| !used[k] && button.contains(&i) && !button.contains(&j))
-                    .count();
+                if goal[j] < goal[i] {
+                    if let Ok((_, button)) = buttons_can_add
+                        .clone()
+                        .filter(|&(k, _)| !used[k])
+                        .filter(|&(_, button)| button.contains(&i) && !button.contains(&j))
+                        .exactly_one()
+                    {
+                        let mut new_goal = goal.to_vec();
+                        let n = goal[i] - goal[j];
+                        for &b in button {
+                            if goal[b] < n {
+                                return best;
+                            }
 
-                if count == 0 {
-                    return best;
-                }
+                            new_goal[b] -= n;
+                        }
 
-                if count < target_count {
-                    target = i;
-                    target_count = count;
-                    target_exclude = j;
+                        return solve_rec(buttons, &new_goal, steps + n, best, used);
+                    }
                 }
             }
 
-            if target != i {
-                let count = buttons_can_add
-                    .clone()
-                    .filter(|&(j, button)| !used[j] && button.contains(&i))
-                    .count();
+            if let Ok((_, button)) = buttons_can_add
+                .clone()
+                .filter(|&(k, _)| !used[k])
+                .filter(|(_, button)| button.contains(&i))
+                .exactly_one()
+            {
+                let mut new_goal = goal.to_vec();
+                let n = goal[i];
+                for &b in button {
+                    if goal[b] < n {
+                        return best;
+                    }
 
-                if count == 0 {
-                    return best;
+                    new_goal[b] -= n;
                 }
 
-                if count < target_count || (count == 1 && target_exclude != usize::MAX) {
-                    target = i;
-                    target_count = count;
-                    target_exclude = usize::MAX;
-                }
+                return solve_rec(buttons, &new_goal, steps + n, best, used);
+            }
+
+            let button_options = buttons_can_add
+                .clone()
+                .filter(|&(k, _)| !used[k])
+                .filter(|(_, button)| button.contains(&i))
+                .count();
+
+            if button_options == 0 {
+                return best;
+            }
+
+            let count = button_options * goal[i];
+
+            if count < target_count {
+                target = i;
+                target_count = count;
             }
         }
 
@@ -127,21 +157,13 @@ pub fn part2(input: &Input) -> usize {
             return best.min(Ok(steps));
         }
 
-        let max_remaining_steps = best.unwrap_or(usize::MAX) - steps;
-
         for (i, button) in buttons_can_add {
-            if used[i] || !(button.contains(&target) && !button.contains(&target_exclude)) {
+            if used[i] || !(button.contains(&target)) {
                 continue;
             }
 
-            let min = (target_count == 1)
-                .then(|| goal[target] - goal.get(target_exclude).unwrap_or(&0))
-                .unwrap_or(0);
-            let max = button.iter().map(|&b| goal[b]).min().unwrap().min(max_remaining_steps);
-
-            if min > max {
-                continue;
-            }
+            let min = 0;
+            let max = button.iter().map(|&b| goal[b]).min().unwrap();
 
             let mut new_goal = goal.to_vec();
             button.iter().for_each(|&b| new_goal[b] -= min);
@@ -164,18 +186,10 @@ pub fn part2(input: &Input) -> usize {
         best
     }
 
-    let mut i = 0;
-    let mut now = std::time::Instant::now();
-
     input
-        .iter()
+        .par_iter()
         .map(|(_, buttons, joltages)| {
             solve_rec(buttons, joltages, 0, Err(()), &mut vec![false; buttons.len()]).unwrap()
-        })
-        .inspect(|res| {
-            println!("{i:<3}: {res} in {:?}", now.elapsed());
-            i += 1;
-            now = std::time::Instant::now();
         })
         .sum()
 }
