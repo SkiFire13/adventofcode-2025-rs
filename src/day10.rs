@@ -196,25 +196,31 @@ pub fn part2(input: &Input) -> i32 {
                         continue;
                     }
 
+                    let mut n = matrix[r * cols + r];
+                    let m = matrix[r * cols + x];
                     let mut rhs = matrix[r * cols + (cols - 1)];
                     for i in 0..values.len() {
                         let c = cols - 1 - values.len() + i;
                         if c != x && matrix[r * cols + c] != 0 {
                             if vars.contains(&c) {
-                                continue 'r;
+                                if (matrix[r * cols + c] > 0) == (n > 0) {
+                                    n += matrix[r * cols + c];
+                                } else {
+                                    continue 'r;
+                                }
                             } else {
                                 rhs -= matrix[r * cols + c] * values[i];
                             }
                         }
                     }
 
-                    // Require the corresponding pivot variable to be positive or zero.
-                    let n = matrix[r * cols + r];
-                    let m = matrix[r * cols + x];
+                    // Require the other variables on this line to be >= 0 and <= max_value
                     if (n > 0) ^ (m > 0) {
                         min = min.max(rhs / m);
+                        max = max.min((rhs - max_value * n) / m);
                     } else {
                         max = max.min(rhs / m);
+                        min = min.max((rhs - max_value * n + (m - 1)) / m);
                     }
                 }
 
