@@ -28,19 +28,23 @@ pub fn part2(input: &Input) -> u64 {
     // Compress x coordinates with 1-wide gap inbetween
     let mut ids_x = vec![0; input.len()];
     indexes.sort_by_key(|&i| input[i].0);
-    indexes
-        .chunk_by(|&i, &j| input[i].0 == input[j].0)
-        .enumerate()
-        .for_each(|(id, chunk)| chunk.iter().for_each(|&i| ids_x[i] = 2 * id + 1));
+    let (mut prevx, mut previ) = (input[indexes[0]].0, 0);
+    for &i in &indexes {
+        previ += (input[i].0 > prevx) as usize + (input[i].0 > prevx + 1) as usize;
+        prevx = input[i].0;
+        ids_x[i] = previ + 1;
+    }
     let w = ids_x[indexes[indexes.len() - 1]] + 1;
 
     // Compress y coordinates with 1-wide gap inbetween
     let mut ids_y = vec![0; input.len()];
     indexes.sort_by_key(|&i| input[i].1);
-    indexes
-        .chunk_by(|&i, &j| input[i].1 == input[j].1)
-        .enumerate()
-        .for_each(|(id, chunk)| chunk.iter().for_each(|&i| ids_y[i] = 2 * id + 1));
+    let (mut prevy, mut previ) = (input[indexes[0]].1, 0);
+    for &i in &indexes {
+        previ += (input[i].1 > prevy) as usize + (input[i].1 > prevy + 1) as usize;
+        prevy = input[i].1;
+        ids_y[i] = previ + 1;
+    }
     let h = ids_y[indexes[indexes.len() - 1]] + 1;
 
     // Populate the grid for edges
@@ -55,15 +59,26 @@ pub fn part2(input: &Input) -> u64 {
         }
     }
 
-    // Flood fill the interior.
+    // Flood fill the interior, starting from all top sides.
     let top_a = indexes[indexes.len() - 1];
     let top_b = indexes[indexes.len() - 2];
-    let mut queue = vec![((ids_x[top_a] + ids_x[top_b]) / 2, ids_y[top_b] - 1)];
-    while let Some((x, y)) = queue.pop() {
-        if grid[(x, y)] != 1 {
-            grid[(x, y)] = 1;
-            for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                queue.push((x.wrapping_add_signed(dx), y.wrapping_add_signed(dy)));
+    let (top_a, top_b) = (min(top_a, top_b), max(top_a, top_b));
+    let mut queue = Vec::new();
+    for i in 1..input.len() {
+        let (x1, y1) = (ids_x[i - 1], ids_y[i - 1]);
+        let (x2, y2) = (ids_x[i], ids_y[i]);
+
+        let (sx, sy) = ((x1 + x2) / 2, y1 - 1);
+        if y1 == y2 && (x1 < x2) == (ids_x[top_a] < ids_x[top_b]) && grid[(sx, sy)] != 1 {
+            queue.push((sx, sy));
+            while let Some((x, y)) = queue.pop() {
+                for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let (nx, ny) = (x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
+                    if grid[(nx, ny)] != 1 {
+                        grid[(nx, ny)] = 1;
+                        queue.push((nx, ny));
+                    }
+                }
             }
         }
     }
